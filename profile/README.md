@@ -18,6 +18,7 @@ Metorial gives you enterprise-grade infrastructure to connect AI agents to thous
 * [Metorial Platform](https://github.com/metorial/metorial-platform): The core engine behind Metorial, fully open source and self-hostable
 * [MCP Index](https://github.com/metorial/metorial): A curated index of 5,000+ MCP servers
 * [Lowerdeck](https://github.com/metorial/lowerdeck): Shared libraries used across the stack and available for standalone use
+* [Starbase](https://github.com/metorial/starbase): MCP debugging and testing utility
 
 ## SDKs
 

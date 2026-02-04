@@ -1,0 +1,229 @@
+name: Reusable E2E Tests
+
+on:
+  workflow_call:
+    inputs:
+      service_directory:
+        description: Directory containing docker-compose file and env file.
+        required: true
+        type: string
+      compose_file:
+        description: Compose file name/path relative to service_directory.
+        required: false
+        default: docker-compose.dev.yml
+        type: string
+      compose_env_file:
+        description: Env file name/path relative to service_directory.
+        required: false
+        default: .env.ci
+        type: string
+      compose_project_prefix:
+        description: Prefix for docker compose project name.
+        required: true
+        type: string
+      compose_profiles:
+        description: Space-delimited list of compose profiles to enable.
+        required: true
+        type: string
+      wait_services:
+        description: Newline-delimited list of container names to wait for.
+        required: true
+        type: string
+      wait_mode:
+        description: Service readiness mode. healthy or health-or-running.
+        required: false
+        default: health-or-running
+        type: string
+      wait_attempts:
+        description: Max number of polling attempts.
+        required: false
+        default: 60
+        type: number
+      wait_interval_seconds:
+        description: Delay in seconds between polling attempts.
+        required: false
+        default: 5
+        type: number
+      test_container:
+        description: Container name used to execute the test command.
+        required: true
+        type: string
+      test_command:
+        description: Shell command executed in test_container.
+        required: true
+        type: string
+      pre_start_command:
+        description: Optional command to run before docker compose up.
+        required: false
+        default: ''
+        type: string
+      pre_start_workdir:
+        description: Optional working directory for pre_start_command.
+        required: false
+        default: '.'
+        type: string
+      timeout_minutes:
+        description: Job timeout in minutes.
+        required: false
+        default: 30
+        type: number
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Pre-start setup
+        if: inputs.pre_start_command != ''
+        run: |
+          set -euo pipefail
+          cd "${{ inputs.pre_start_workdir }}"
+          ${{ inputs.pre_start_command }}
+
+      - name: Start Docker services
+        env:
+          COMPOSE_PROJECT_NAME: ${{ inputs.compose_project_prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          cd "${{ inputs.service_directory }}"
+
+          profile_flags=""
+          for profile in ${{ inputs.compose_profiles }}; do
+            profile_flags="$profile_flags --profile $profile"
+          done
+
+          docker compose \
+            -p "$COMPOSE_PROJECT_NAME" \
+            -f "${{ inputs.compose_file }}" \
+            --env-file "${{ inputs.compose_env_file }}" \
+            $profile_flags \
+            up -d --build
+
+      - name: Wait for services to be ready
+        env:
+          COMPOSE_PROJECT_NAME: ${{ inputs.compose_project_prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
+          WAIT_SERVICES: ${{ inputs.wait_services }}
+          WAIT_MODE: ${{ inputs.wait_mode }}
+          WAIT_ATTEMPTS: ${{ inputs.wait_attempts }}
+          WAIT_INTERVAL_SECONDS: ${{ inputs.wait_interval_seconds }}
+        run: |
+          set -euo pipefail
+          cd "${{ inputs.service_directory }}"
+
+          mapfile -t services <<< "$WAIT_SERVICES"
+          echo "Waiting for services to be ready..."
+
+          inspect_status() {
+            local service="$1"
+            if [ "$WAIT_MODE" = "healthy" ]; then
+              docker inspect -f '{{.State.Health.Status}}' "$service" 2>/dev/null || echo "missing"
+            else
+              docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$service" 2>/dev/null || echo "missing"
+            fi
+          }
+
+          is_ready() {
+            local status="$1"
+            if [ "$WAIT_MODE" = "healthy" ]; then
+              [ "$status" = "healthy" ]
+            else
+              [ "$status" = "healthy" ] || [ "$status" = "running" ]
+            fi
+          }
+
+          all_ready=false
+          for ((attempt = 1; attempt <= WAIT_ATTEMPTS; attempt++)); do
+            all_ready=true
+            for service in "${services[@]}"; do
+              service="$(echo "$service" | xargs)"
+              [ -z "$service" ] && continue
+
+              status="$(inspect_status "$service")"
+              if ! is_ready "$status"; then
+                all_ready=false
+                break
+              fi
+            done
+
+            if [ "$all_ready" = true ]; then
+              break
+            fi
+
+            sleep "$WAIT_INTERVAL_SECONDS"
+          done
+
+          if [ "$all_ready" != true ]; then
+            echo "Timed out waiting for services to become ready."
+            docker compose \
+              -p "$COMPOSE_PROJECT_NAME" \
+              -f "${{ inputs.compose_file }}" \
+              --env-file "${{ inputs.compose_env_file }}" \
+              ps || true
+
+            echo "=== Unready Service Logs ==="
+            for service in "${services[@]}"; do
+              service="$(echo "$service" | xargs)"
+              [ -z "$service" ] && continue
+
+              status="$(inspect_status "$service")"
+              if ! is_ready "$status"; then
+                echo "--- $service ($status) ---"
+                docker logs "$service" --tail=200 || true
+              fi
+            done
+            exit 1
+          fi
+
+          echo "Services are ready."
+          docker compose \
+            -p "$COMPOSE_PROJECT_NAME" \
+            -f "${{ inputs.compose_file }}" \
+            --env-file "${{ inputs.compose_env_file }}" \
+            ps
+
+      - name: Run E2E tests
+        run: |
+          set -euo pipefail
+          docker exec "${{ inputs.test_container }}" sh -c "${{ inputs.test_command }}"
+
+      - name: Collect logs on failure
+        if: failure()
+        env:
+          COMPOSE_PROJECT_NAME: ${{ inputs.compose_project_prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          cd "${{ inputs.service_directory }}"
+
+          echo "=== Docker Compose Logs ==="
+          docker compose \
+            -p "$COMPOSE_PROJECT_NAME" \
+            -f "${{ inputs.compose_file }}" \
+            --env-file "${{ inputs.compose_env_file }}" \
+            logs --tail=100 || true
+
+          echo "=== Service Container Logs ==="
+          docker logs "${{ inputs.test_container }}" --tail=200 || true
+
+          echo "=== Service Status ==="
+          docker compose \
+            -p "$COMPOSE_PROJECT_NAME" \
+            -f "${{ inputs.compose_file }}" \
+            --env-file "${{ inputs.compose_env_file }}" \
+            ps || true
+
+      - name: Cleanup
+        if: always()
+        env:
+          COMPOSE_PROJECT_NAME: ${{ inputs.compose_project_prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          cd "${{ inputs.service_directory }}"
+          docker compose \
+            -p "$COMPOSE_PROJECT_NAME" \
+            -f "${{ inputs.compose_file }}" \
+            --env-file "${{ inputs.compose_env_file }}" \
+            down -v || true

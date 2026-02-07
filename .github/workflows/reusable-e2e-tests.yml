@@ -72,10 +72,20 @@ jobs:
   e2e-tests:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes }}
+    permissions:
+      contents: read
+      packages: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - name: Pre-start setup
         if: inputs.pre_start_command != ''

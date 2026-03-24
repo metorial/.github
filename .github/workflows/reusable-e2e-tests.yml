@@ -67,6 +67,20 @@ on:
         required: false
         default: 30
         type: number
+      checkout_submodules:
+        description: Whether to initialize git submodules for the checkout.
+        required: false
+        default: false
+        type: boolean
+      submodule_setup_command:
+        description: Optional command run after top-level submodules are initialized and before recursive submodule init.
+        required: false
+        default: ''
+        type: string
+    secrets:
+      GH_TOKEN:
+        description: Optional token for checkout, submodule access, and GHCR auth. Defaults to github.token.
+        required: false
 
 jobs:
   e2e-tests:
@@ -79,13 +93,36 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: true
+          token: ${{ secrets.GH_TOKEN || github.token }}
+
+      - name: Initialize submodules
+        if: inputs.checkout_submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git submodule sync --recursive
+
+          # Initialize top-level submodules first so callers can patch nested metadata
+          # before the recursive update runs.
+          git submodule update --init --force --depth=1
+
+          if [ -n "${{ inputs.submodule_setup_command }}" ]; then
+            ${{ inputs.submodule_setup_command }}
+          fi
+
+          git submodule sync --recursive
+          git submodule update --init --force --depth=1 --recursive --jobs 8
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ github.token }}
+          password: ${{ secrets.GH_TOKEN || github.token }}
 
       - name: Pre-start setup
         if: inputs.pre_start_command != ''

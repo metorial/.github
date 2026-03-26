@@ -77,6 +77,11 @@ on:
         required: false
         default: ''
         type: string
+      runs-on:
+        description: Override default actions runner
+        required: false
+        default: 'ubuntu-latest'
+        type: string
     secrets:
       GH_TOKEN:
         description: Optional token for checkout, submodule access, and GHCR auth. Defaults to github.token.
@@ -84,7 +89,7 @@ on:
 
 jobs:
   e2e-tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     timeout-minutes: ${{ inputs.timeout_minutes }}
     permissions:
       contents: read

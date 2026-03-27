@@ -103,24 +103,24 @@ jobs:
           persist-credentials: true
           token: ${{ secrets.GH_TOKEN || github.token }}
 
-      - name: Initialize submodules
-        if: inputs.checkout_submodules
-        shell: bash
-        run: |
-          set -euo pipefail
+      # - name: Initialize submodules
+      #   if: inputs.checkout_submodules
+      #   shell: bash
+      #   run: |
+      #     set -euo pipefail
 
-          git submodule sync --recursive
+      #     git submodule sync --recursive
 
-          # Initialize top-level submodules first so callers can patch nested metadata
-          # before the recursive update runs.
-          git submodule update --init --force --depth=1
+      #     # Initialize top-level submodules first so callers can patch nested metadata
+      #     # before the recursive update runs.
+      #     git submodule update --init --force --depth=1
 
-          if [ -n "${{ inputs.submodule_setup_command }}" ]; then
-            ${{ inputs.submodule_setup_command }}
-          fi
+      #     if [ -n "${{ inputs.submodule_setup_command }}" ]; then
+      #       ${{ inputs.submodule_setup_command }}
+      #     fi
 
-          git submodule sync --recursive
-          git submodule update --init --force --depth=1 --recursive --jobs 8
+      #     git submodule sync --recursive
+      #     git submodule update --init --force --depth=1 --recursive --jobs 8
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3

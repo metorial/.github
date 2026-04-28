@@ -30,6 +30,8 @@ Metorial has two main surfaces:
 
 ### Metorial Platform
 
+<img src="../platform.png" alt="Platform" />
+
 Metorial Platform is the developer surface.
 
 It lets teams use managed integrations, proxy remote MCP servers, or host custom servers, with the identity, access control, and auditability layer around them.
@@ -37,6 +39,8 @@ It lets teams use managed integrations, proxy remote MCP servers, or host custom
 This is the core platform for building and deploying agent integrations in production.
 
 ### Metorial Portals
+
+<img src="../portals.png" alt="Portals" />
 
 Metorial Portals is the employee-facing surface.
 
@@ -58,8 +62,9 @@ Metorial is built for teams that need to answer the operational questions around
 
 ## Ecosystem
 
-* [Metorial](https://github.com/metorial/metorial): 1000+ high-quality MCP servers covering major SaaS tools and enterprise systems
+* [Metorial](https://github.com/metorial/metorial): 1000+ high-quality integrations covering major SaaS tools and enterprise systems
 * [Metorial Platform](https://github.com/metorial/metorial-platform): The core engine behind Metorial, fully open source and self-hostable
+* [Metorial Platform](https://github.com/metorial/cli): An agent-first CLI to interact with Metorial resources and integrations
 * [Lowerdeck](https://github.com/metorial/lowerdeck): Shared libraries used across the stack and available for standalone use
 * [Starbase](https://github.com/metorial/starbase): MCP debugging and testing utility
 

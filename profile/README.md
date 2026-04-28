@@ -26,11 +26,9 @@ In practice, Metorial gives teams access to thousands of integrations and handle
 
 ## Product surfaces
 
-Metorial has two main surfaces:
+Metorial has two main surfaces: Platform and Portals.
 
 ### Metorial Platform
-
-<img src="../platform.png" alt="Platform" />
 
 Metorial Platform is the developer surface.
 
@@ -38,15 +36,17 @@ It lets teams use managed integrations, proxy remote MCP servers, or host custom
 
 This is the core platform for building and deploying agent integrations in production.
 
-### Metorial Portals
+<img src="../platform.png" alt="Platform" />
 
-<img src="../portals.png" alt="Portals" />
+### Metorial Portals
 
 Metorial Portals is the employee-facing surface.
 
 It gives employees a marketplace of integrations they can connect to, with access provisioned through SSO and SAML group-based delegation.
 
 This gives internal AI rollouts a cleaner distribution and access model across teams, without turning access management into a manual IT workflow.
+
+<img src="../portals.png" alt="Portals" />
 
 ## What Metorial handles
 
